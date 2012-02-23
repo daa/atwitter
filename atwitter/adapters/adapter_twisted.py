@@ -40,7 +40,7 @@ def request(rq):
             StringProducer(rq.data) if rq.data else None)
 
 
-class TwitterResponseProtocol(protocol.Protocol):
+class ParsedResponseProtocol(protocol.Protocol):
     def __init__(self, response):
         self.response = response
         self.deferred = defer.Deferred()
@@ -68,7 +68,7 @@ class ProtocolFactory(protocol.Factory):
     """
     Factory to build protocol which will receive data from response
     """
-    protocol = TwitterResponseProtocol
+    protocol = ParsedResponseProtocol
 
     def __init__(self, parser=None):
         self.parser = parser
