@@ -5,12 +5,17 @@ which later may be executed
 """
 
 import oauth2
+import base64
 from urllib import urlencode
+
+from .util import ensure_utf8, encode_multipart
+
 
 SIGNATURE_METHOD = oauth2.SignatureMethod_HMAC_SHA1()
 
-BASE_URL="https://api.twitter.com/1"
-SEARCH_URL="http://search.twitter.com/search.json"
+BASE_URL = 'https://api.twitter.com/1'
+UPLOAD_URL = 'https://upload.twitter.com/1'
+SEARCH_URL = 'http://search.twitter.com/search.json'
 
 class TwitterClientInfo(object):
     def __init__(self, name, version=None, url=None):
@@ -41,17 +46,15 @@ class TwitterRequest(object):
                 repr(self.headers), repr(self.data))
 
 
-def ensure_utf8(x):
-    return x.encode('utf-8') if isinstance(x, unicode) else x
-
-
 class TwitterRequestFactory(object):
     agent="atwitter"
 
     def __init__(self, consumer, token, signature_method=SIGNATURE_METHOD,
-            base_url=BASE_URL, search_url=SEARCH_URL, client_info = None):
+            base_url=BASE_URL, search_url=SEARCH_URL, upload_url=UPLOAD_URL,
+            client_info = None):
 
         self.base_url = base_url
+        self.upload_url = upload_url
         self.search_url = search_url
 
         self.client_info = None
@@ -66,8 +69,8 @@ class TwitterRequestFactory(object):
 
         self.client_info = client_info
 
-    def api_url(self, call):
-        return self.base_url.rstrip('/') + '/' + call.lstrip('/')
+    def api_url(self, call, base_url=None):
+        return (self.base_url if base_url is None else base_url).rstrip('/') + '/' + call.lstrip('/')
 
     def oauth_header(self, method, url, parameters={}, header={}):
         oauth_request = oauth2.Request.from_consumer_and_token(self.consumer,
@@ -87,7 +90,8 @@ class TwitterRequestFactory(object):
 
     def post(self, call, params, data=None):
         url = self.api_url(call)
-        headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+        if headers is None:
+            headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
         headers.update(self.oauth_header('POST', url, params))
         if self.client_info:
             headers.update(self.client_info.headers())
@@ -95,11 +99,23 @@ class TwitterRequestFactory(object):
         return TwitterRequest('POST',
                 url, headers, self._urlencode(params))
 
+    def post_multipart(self, call, params={}, files=(), base_url=None):
+        url = self.api_url(call, base_url)
+        boundary, body = encode_multipart(params.items(), files)
+        headers = {'Content-Type': 'multipart/form-data; boundary=%s' % boundary}
+        headers.update(self.oauth_header('POST', url))
+        if self.client_info:
+            headers.update(self.client_info.headers())
+            params['source'] = self.client_info.source()
+        return TwitterRequest('POST', url, headers, body)
+
+    def configuration(self):
+        return self.get('/help/configuration.json')
+
     def show_user(self, screen_name=None, user_id=None, include_entities=True):
         """
         Get the info for a specific user.
-        Returns a delegate that will receive the user in a callback."""
-
+        """
         params = {}
         if user_id:
             params['user_id'] = user_id
@@ -113,8 +129,27 @@ class TwitterRequestFactory(object):
         return self.get('/account/rate_limit_status.json')
 
     def update(self, status, params={}):
-        "Update your status.  Returns the ID of the new post."
+        """
+        Update your status.
+        """
         params = params.copy()
         params['status'] = status
         return self.post('/statuses/update.json', params)
+
+    def update_with_media(self, status, media, **kw):
+        """
+        Updates the authenticating user's status and attaches media for upload.
+        """
+        kw['status'] = status
+        return self.post_multipart('/statuses/update_with_media.json', kw, [('media[]', f, v) for f, v in media],
+            base_url=self.upload_url)
+
+    def update_profile_image(self, image, image_filename, include_entities=None, skip_status=None):
+        params = {}
+        if include_entities is not None:
+            params['include_entities'] = str(include_entities).lower()
+        if skip_status is not None:
+            params['skip_status'] = str(skip_status).lower()
+        return self.post_multipart('/account/update_profile_image.json', params,
+            [('image', image_filename, image)])
 

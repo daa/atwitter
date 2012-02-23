@@ -6,13 +6,14 @@ _mapping = {}
 class Meta(type):
     def __new__(mcs, name, bases, dict):
         c = type.__new__(mcs, name, bases, dict)
+        print dict
         s = dict['status']
-        print 'meta', repr(s)
+        print 'meta', name, repr(s)
         if s is not None:
             _mapping[s] = c
         return c
 
-class TwitterError(Exception):
+class BaseTwitterError(Exception):
     status = None
     __metaclass__ = Meta
 
@@ -20,28 +21,36 @@ class TwitterError(Exception):
         self.message = message
         self.response = response
 
-class RateLimitExceeded(TwitterError):
+class TwitterError(BaseTwitterError):
+    status = None
+
+    def __init__(self, status, message, response):
+        self.status = status
+        self.message = message
+        self.response = response
+
+class RateLimitExceeded(BaseTwitterError):
     status = 400
 
-class Unauthorized(TwitterError):
+class Unauthorized(BaseTwitterError):
     status = 401
 
-class NotFound(TwitterError):
+class NotFound(BaseTwitterError):
     status = 403
 
-class NotAcceptable(TwitterError):
+class NotAcceptable(BaseTwitterError):
     status = 406
 
-class StreamingRateLimitExceeded(TwitterError):
+class StreamingRateLimitExceeded(BaseTwitterError):
     status = 420
 
-class InternalServerError(TwitterError):
+class InternalServerError(BaseTwitterError):
     status = 500
 
-class BadGateway(TwitterError):
+class BadGateway(BaseTwitterError):
     status = 502
 
-class Unavailable(TwitterError):
+class Unavailable(BaseTwitterError):
     status = 503
 
 
