@@ -51,7 +51,7 @@ class TwitterRequestFactory(object):
 
     def __init__(self, consumer, token, signature_method=SIGNATURE_METHOD,
             base_url=BASE_URL, search_url=SEARCH_URL, upload_url=UPLOAD_URL,
-            client_info = None):
+            client_info=None):
 
         self.base_url = base_url
         self.upload_url = upload_url

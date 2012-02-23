@@ -15,5 +15,8 @@ class NoopParser(BaseParser):
 
 class JSONParser(BaseParser):
     def parse(self, data):
-        return json.loads(data) if data else None
+        try:
+            return json.loads(data) if data else None
+        except:
+            return {'unparsed': data}
 
