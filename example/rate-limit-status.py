@@ -6,7 +6,7 @@ from twisted.web import client
 from twisted.internet import reactor
 
 from atwitter import twitterrq
-from atwitter.adapters import adapter_twisted
+from atwitter.adapters import twisted_adapter
 
 consumer = oauth2.Consumer(sys.argv[1], sys.argv[2])
 if len(sys.argv) > 3:
@@ -19,8 +19,8 @@ agent = client.Agent(reactor)
 def got(x):
     print 'Got', x
 
-agent.request(*adapter_twisted.request(factory.rate_limit_status())).addCallback(
-    adapter_twisted.response_callback()).addCallback(
+agent.request(*twisted_adapter.request(factory.rate_limit_status())).addCallback(
+    twisted_adapter.response_callback()).addCallback(
     got).addBoth(lambda x: reactor.stop())
 
 reactor.run()

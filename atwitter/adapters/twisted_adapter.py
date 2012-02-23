@@ -9,6 +9,8 @@ from twisted.web.client import _parse, ResponseDone
 from twisted.web.http import PotentialDataLoss, OK
 from twisted.internet import protocol, defer
 
+from atwitter import error as terror
+
 
 class StringProducer(object):
     implements(iweb.IBodyProducer)
@@ -40,7 +42,7 @@ def request(rq):
             StringProducer(rq.data) if rq.data else None)
 
 
-class ParsedResponseProtocol(protocol.Protocol):
+class ResponseProtocol(protocol.Protocol):
     def __init__(self, response):
         self.response = response
         self.deferred = defer.Deferred()
@@ -53,22 +55,21 @@ class ParsedResponseProtocol(protocol.Protocol):
         if reason.check(ResponseDone, PotentialDataLoss):
             data = ''.join(self._buffer)
             try:
-                parsed = self.factory.parse(data)
                 if self.response.code == OK:
-                    self.deferred.callback(parsed)
+                    self.deferred.callback(self.factory.callback_result(data, self.response))
                 else:
-                    self.deferred.errback(error.Error(self.response.code, response=parsed))
+                    self.deferred.errback(self.factory.errback_result(error.Error(self.response.code, response=data), self.response))
             except Exception, e:
                 self.deferred.errback(e)
         else:
-            self.deferred.errback(reason)
+            self.deferred.errback(self.factory.errback_result(reason, response))
 
 
 class ProtocolFactory(protocol.Factory):
     """
     Factory to build protocol which will receive data from response
     """
-    protocol = ParsedResponseProtocol
+    protocol = ResponseProtocol
 
     def __init__(self, parser=None):
         self.parser = parser
@@ -80,6 +81,14 @@ class ProtocolFactory(protocol.Factory):
 
     def parse(self, data):
         return self.parser.parse(data) if self.parser else data
+
+    def errback_result(self, e, response):
+        if isinstance(e, error.Error):
+            e = terror.http2error(e.status, e.message, self.parse(e.response))
+        return e
+
+    def callback_result(self, data, response):
+        return self.parse(data)
 
 
 def response_callback(pf=ProtocolFactory()):
