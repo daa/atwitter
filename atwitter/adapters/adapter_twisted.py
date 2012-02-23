@@ -4,9 +4,9 @@ Adapter of atwitter.twitterrq.TwitterRequest to twisted.web. machinery
 
 from zope.interface import implements
 from twisted.web.http_headers import Headers
-from twisted.web import iweb
+from twisted.web import iweb, error
 from twisted.web.client import _parse, ResponseDone
-from twisted.web.http import PotentialDataLoss
+from twisted.web.http import PotentialDataLoss, OK
 from twisted.internet import protocol, defer
 
 
@@ -47,13 +47,19 @@ class TwitterResponseProtocol(protocol.Protocol):
         self._buffer = []
 
     def dataReceived(self, data):
-        print 'DATA', data
         self._buffer.append(data)
 
     def connectionLost(self, reason):
-        print 'LOST', reason
         if reason.check(ResponseDone, PotentialDataLoss):
-            self.deferred.callback(self.factory.parse(''.join(self._buffer)))
+            data = ''.join(self._buffer)
+            try:
+                parsed = self.factory.parse(data)
+                if self.response.code == OK:
+                    self.deferred.callback(parsed)
+                else:
+                    self.deferred.errback(error.Error(self.response.code, response=parsed))
+            except Exception, e:
+                self.deferred.errback(e)
         else:
             self.deferred.errback(reason)
 
@@ -68,7 +74,6 @@ class ProtocolFactory(protocol.Factory):
         self.parser = parser
 
     def buildProtocol(self, response):
-        print 'BUILD', response
         p = self.protocol(response)
         p.factory = self
         return p
@@ -79,7 +84,6 @@ class ProtocolFactory(protocol.Factory):
 
 def response_callback(pf=ProtocolFactory()):
     def callback(response):
-        print 'CALLBACK'
         p = pf.buildProtocol(response)
         response.deliverBody(p)
         return p.deferred
