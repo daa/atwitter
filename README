@@ -1,0 +1,4 @@
+atwitter is partly based on twitty-twister, but here twitter request is separated from HTTP work
+
+also currently it implements only several functions
+
