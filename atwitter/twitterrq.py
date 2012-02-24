@@ -47,11 +47,11 @@ class TwitterRequest(object):
 
 
 class TwitterRequestFactory(object):
-    agent="atwitter"
+    agent = "atwitter"
 
     def __init__(self, consumer, token, signature_method=SIGNATURE_METHOD,
             base_url=BASE_URL, search_url=SEARCH_URL, upload_url=UPLOAD_URL,
-            client_info=None):
+            client_info = None):
 
         self.base_url = base_url
         self.upload_url = upload_url
@@ -72,7 +72,10 @@ class TwitterRequestFactory(object):
     def api_url(self, call, base_url=None):
         return (self.base_url if base_url is None else base_url).rstrip('/') + '/' + call.lstrip('/')
 
-    def oauth_header(self, method, url, parameters={}, header={}):
+    def user_agent_header(self):
+        return {'User-Agent': self.agent} if self.agent else {}
+
+    def oauth_header(self, method, url, parameters={}):
         oauth_request = oauth2.Request.from_consumer_and_token(self.consumer,
             token=self.token, http_method=method, http_url=url, parameters=parameters)
         oauth_request.sign_request(self.signature_method, self.consumer, self.token)
@@ -84,14 +87,17 @@ class TwitterRequestFactory(object):
 
     def get(self, call, params=None):
         url = self.api_url(call)
+        headers = self.user_agent_header()
+        headers.update(self.oauth_header('GET', url, params or {}))
         return TwitterRequest('GET',
                 url + '?' + self._urlencode(params) if params else url,
-                self.oauth_header('GET', url, params or {}))
+                headers)
 
     def post(self, call, params, data=None):
         url = self.api_url(call)
         if headers is None:
             headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+        headers.update(self.user_agent_header())
         headers.update(self.oauth_header('POST', url, params))
         if self.client_info:
             headers.update(self.client_info.headers())
@@ -103,6 +109,7 @@ class TwitterRequestFactory(object):
         url = self.api_url(call, base_url)
         boundary, body = encode_multipart(params.items(), files)
         headers = {'Content-Type': 'multipart/form-data; boundary=%s' % boundary}
+        headers.update(self.user_agent_header())
         headers.update(self.oauth_header('POST', url))
         if self.client_info:
             headers.update(self.client_info.headers())
