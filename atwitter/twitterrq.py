@@ -95,8 +95,7 @@ class TwitterRequestFactory(object):
 
     def post(self, call, params, data=None):
         url = self.api_url(call)
-        if headers is None:
-            headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+        headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
         headers.update(self.user_agent_header())
         headers.update(self.oauth_header('POST', url, params))
         if self.client_info:
