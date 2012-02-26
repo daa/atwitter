@@ -8,5 +8,5 @@ setup(name='atwitter',
     url='http://github.com/daa/atwitter/',
     license='MIT',
     platforms='any',
-    packages=['atwitter'],
+    packages=['atwitter', 'atwitter.adapters'],
 )
