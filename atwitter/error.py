@@ -6,9 +6,7 @@ _mapping = {}
 class Meta(type):
     def __new__(mcs, name, bases, dict):
         c = type.__new__(mcs, name, bases, dict)
-        print dict
         s = dict['status']
-        print 'meta', name, repr(s)
         if s is not None:
             _mapping[s] = c
         return c
