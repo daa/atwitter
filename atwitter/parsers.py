@@ -1,7 +1,10 @@
 """
 Parse response
 """
-import json
+
+from json import loads as jloads
+from urlparse import parse_qs
+
 
 class BaseParser(object):
     def parse(self, data):
@@ -16,7 +19,13 @@ class NoopParser(BaseParser):
 class JSONParser(BaseParser):
     def parse(self, data):
         try:
-            return json.loads(data) if data else None
+            return jloads(data) if data else None
         except:
             return {'unparsed': data}
+
+
+class QueryStringParser(BaseParser):
+    def parse(self, data):
+        return parse_qs(data)
+
 

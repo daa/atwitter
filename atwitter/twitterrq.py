@@ -14,6 +14,7 @@ from .util import ensure_utf8, encode_multipart
 SIGNATURE_METHOD = oauth2.SignatureMethod_HMAC_SHA1()
 
 BASE_URL = 'https://api.twitter.com/1'
+OAUTH_URL = 'https://api.twitter.com/oauth'
 UPLOAD_URL = 'https://upload.twitter.com/1'
 SEARCH_URL = 'http://search.twitter.com/search.json'
 
@@ -50,12 +51,13 @@ class TwitterRequestFactory(object):
     agent = "atwitter"
 
     def __init__(self, consumer, token, signature_method=SIGNATURE_METHOD,
-            base_url=BASE_URL, search_url=SEARCH_URL, upload_url=UPLOAD_URL,
+            base_url=BASE_URL, search_url=SEARCH_URL, upload_url=UPLOAD_URL, oauth_url=OAUTH_URL,
             client_info = None):
 
         self.base_url = base_url
         self.upload_url = upload_url
         self.search_url = search_url
+        self.oauth_url = oauth_url
 
         self.client_info = None
 
@@ -75,9 +77,9 @@ class TwitterRequestFactory(object):
     def user_agent_header(self):
         return {'User-Agent': self.agent} if self.agent else {}
 
-    def oauth_header(self, method, url, parameters={}):
+    def oauth_header(self, method, url, body='', parameters=None):
         oauth_request = oauth2.Request.from_consumer_and_token(self.consumer,
-            token=self.token, http_method=method, http_url=url, parameters=parameters)
+            token=self.token, http_method=method, http_url=url, parameters=parameters, body=body)
         oauth_request.sign_request(self.signature_method, self.consumer, self.token)
         return dict((ensure_utf8(k), ensure_utf8(v)) for k, v in oauth_request.to_header().iteritems())
 
@@ -88,31 +90,31 @@ class TwitterRequestFactory(object):
     def get(self, call, params=None):
         url = self.api_url(call)
         headers = self.user_agent_header()
-        headers.update(self.oauth_header('GET', url, params or {}))
+        headers.update(self.oauth_header('GET', url))
         return TwitterRequest('GET',
                 url + '?' + self._urlencode(params) if params else url,
                 headers)
 
-    def post(self, call, params, data=None):
-        url = self.api_url(call)
+    def post(self, call, params, oauth_params={}, base_url=None):
+        url = self.api_url(call, base_url)
         headers = {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
         headers.update(self.user_agent_header())
-        headers.update(self.oauth_header('POST', url, params))
         if self.client_info:
             headers.update(self.client_info.headers())
             params['source'] = self.client_info.source()
-        return TwitterRequest('POST',
-                url, headers, self._urlencode(params))
+        body = self._urlencode(params)
+        headers.update(self.oauth_header('POST', url, body=body, parameters=oauth_params))
+        return TwitterRequest('POST', url, headers, body)
 
     def post_multipart(self, call, params={}, files=(), base_url=None):
         url = self.api_url(call, base_url)
         boundary, body = encode_multipart(params.items(), files)
         headers = {'Content-Type': 'multipart/form-data; boundary=%s' % boundary}
         headers.update(self.user_agent_header())
-        headers.update(self.oauth_header('POST', url))
         if self.client_info:
             headers.update(self.client_info.headers())
             params['source'] = self.client_info.source()
+        headers.update(self.oauth_header('POST', url))
         return TwitterRequest('POST', url, headers, body)
 
     def configuration(self):
@@ -158,4 +160,14 @@ class TwitterRequestFactory(object):
             params['skip_status'] = str(skip_status).lower()
         return self.post_multipart('/account/update_profile_image.json', params,
             [('image', image_filename, image)])
+
+    def request_token(self, oauth_callback='oob'):
+        return self.post('/request_token', {},
+                oauth_params={'oauth_callback': oauth_callback},
+                base_url=self.oauth_url)
+
+    def access_token(self, oauth_verifier):
+        return self.post('/access_token', {},
+                oauth_params={'oauth_verifier': oauth_verifier},
+                base_url=self.oauth_url)
 

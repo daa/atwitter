@@ -10,8 +10,7 @@ if __name__ == '__main__':
     import sys
     consumer = oauth2.Consumer(sys.argv[1], sys.argv[2])
     f = twitterrq.TwitterRequestFactory(consumer, None)
-    trq = f.request_token()
-    print trq
+    trq = f.request_token(sys.argv[3] if len(sys.argv) > 3 else 'oob')
     urq = urllib2_adapter.request(trq)
     try:
         r = urllib2.urlopen(urq)
